@@ -52,7 +52,7 @@ public class LYTabBarView: NSView {
             }
         }
     }
-
+    
     public var needAnimation: Bool = true
     public var isActive: Bool = true {
         didSet {
@@ -64,7 +64,7 @@ public class LYTabBarView: NSView {
             }
         }
     }
-    public var hideIfOnlyOneTabExists: Bool = true {
+    public var hideIfOnlyOneTabExists: Bool = false {
         didSet {
             checkVisibilityAccordingToTabCount()
         }
@@ -119,8 +119,8 @@ public class LYTabBarView: NSView {
     ]
 
     public var borderColor: ColorConfig = [
-        .active: NSColor(white: 0.72, alpha: 1),
-        .windowInactive: NSColor(white: 0.86, alpha: 1),
+        .active: NSColor.clear, // NSColor(white: 0.72, alpha: 1),
+        .windowInactive: NSColor.clear,
         .inactive: NSColor(white: 0.71, alpha: 1)
     ]
 
@@ -172,11 +172,12 @@ public class LYTabBarView: NSView {
     }
 
     let tabContainerView = NSStackView(frame: .zero)
+    let rightMenuStackView = NSStackView(frame: .zero)
     private var buttonHeight: CGFloat {
         if let tabItemView = self.tabItemViews().first {
             return tabItemView.frame.size.height
         }
-        return 20
+        return 32
     }
     private let outterStackView = NSStackView(frame: .zero)
     private var addTabButton: NSButton!
@@ -213,6 +214,22 @@ public class LYTabBarView: NSView {
         button.widthAnchor.constraint(equalTo: button.heightAnchor).isActive = true
         return button
     }
+    
+    private func buildAddBarButton(image: NSImage?, action: Selector?) -> NSButton {
+        let button = NSButton(frame: .zero)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setButtonType(.momentaryChange)
+        button.image = image
+        button.bezelStyle = .shadowlessSquare
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+        button.target = self
+        button.action = action
+        let constraint = button.heightAnchor.constraint(equalToConstant: buttonHeight)
+        constraint.isActive = true
+        button.widthAnchor.constraint(equalTo: button.heightAnchor, constant: 10).isActive = true
+        return button
+    }
 
     private func setupViews() {
         outterStackView.translatesAutoresizingMaskIntoConstraints = false
@@ -239,11 +256,21 @@ public class LYTabBarView: NSView {
 
         packedTabButton = buildBarButton(image: NSImage(named: NSImage.Name.rightFacingTriangleTemplate),
                                          action: #selector(showPackedList))
-        addTabButton = buildBarButton(image: NSImage(named: NSImage.Name.addTemplate),
+        addTabButton = buildAddBarButton(image: NSImage(named: NSImage.Name.addTemplate),
                                       action: #selector(addNewTab))
+        
+        rightMenuStackView.translatesAutoresizingMaskIntoConstraints = false
+        outterStackView.addView(rightMenuStackView, in: .bottom)
+        rightMenuStackView.orientation = .horizontal
+        rightMenuStackView.distribution = .fill
+        rightMenuStackView.spacing = 8
+        rightMenuStackView.setHuggingPriority(NSLayoutConstraint.Priority.defaultLow, for: .horizontal)
+        rightMenuStackView.setHuggingPriority(NSLayoutConstraint.Priority.defaultLow, for: .vertical)
+        let constraint = rightMenuStackView.heightAnchor.constraint(equalToConstant: buttonHeight)
+        constraint.isActive = true
+        buttonHeightConstraints.append(constraint)
 
-        outterStackView.addView(packedTabButton, in: .bottom)
-        outterStackView.addView(addTabButton, in: .bottom)
+        rightMenuStackView.addView(addTabButton, in: .bottom)
         packedTabButton.isHidden = true
         addTabButton.isHidden = !showAddNewTabButton
 
@@ -264,6 +291,14 @@ public class LYTabBarView: NSView {
                                                selector: #selector(boundDidChangeNotification),
                                                name: NSView.frameDidChangeNotification,
                                                object: self)
+    }
+    
+    public func addButtonIntoRightMenu(button: NSButton) {
+        rightMenuStackView.addView(button, in: .top)
+    }
+    
+    public func addButtonsIntoRightMenu(buttons: [NSButton]) {
+        
     }
 
     open override func viewDidMoveToWindow() {
@@ -444,11 +479,6 @@ public class LYTabBarView: NSView {
         self.borderColor[status]!.setFill()
         self.bounds.fill()
         self.backgroundColor[status]!.setFill()
-        for button in [packedTabButton, addTabButton] {
-            if let rect = button?.frame {
-                rect.fill()
-            }
-        }
 
         if paddingWindowButton {
             let paddingRect = NSRect(x: 0, y: 0,
@@ -602,6 +632,8 @@ public class LYTabBarView: NSView {
         }
         self.insertToPackedItems(self.lastUnpackedItem, index: 0)
         self.tabContainerView.removeView(lastTabView)
+        
+        
         updateTabState()
     }
 
@@ -624,6 +656,7 @@ public class LYTabBarView: NSView {
         self.packedTabViewItems.insert(item, at: index)
     }
 
+    var placeHolderView: NSView?
     private func insertTabItem(_ item: NSTabViewItem, index: NSInteger, animated: Bool = false) {
         let needPack = needPackItem(addtion: 1)
         if needPack || (hasPackedTabViewItems && index > self.tabItemViews().count) {
@@ -640,6 +673,27 @@ public class LYTabBarView: NSView {
                                     inGravity: .center,
                                     animated: animated,
                                     completionHandler: nil)
+        
+        if let _ = placeHolderView {
+//            let constraint = tabView.widthAnchor.constraint(equalToConstant: 152)
+//            constraint.priority = .init(999)
+//            constraint.isActive = true
+            
+        } else {
+            
+            placeHolderView = NSView(frame: .zero)
+            placeHolderView?.setContentHuggingPriority(.defaultLow, for: .horizontal)
+//            placeHolderView?.wantsLayer = true
+//            placeHolderView?.layer?.backgroundColor = NSColor.blue.cgColor
+   
+            let constraint = tabView.widthAnchor.constraint(equalToConstant: 42)
+            constraint.priority = .init(999)
+            constraint.isActive = true
+            tabView.setContentHuggingPriority(.defaultHigh + 10, for: .horizontal)
+            
+            tabContainerView.insertView(placeHolderView!, at: index+1, in: .center)
+        }
+        
         if tabItemViews().count == 1 {
             resetHeight()
         }
